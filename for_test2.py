@@ -32,21 +32,37 @@ def generate_one_person(_):
         "jobless_subsidy": single_person.jobless_subsidy,
         "birth_willingness": single_person.birth_willingness,
         "salary_yearly_increase_rate": single_person.salary_yearly_increase_rate,
-        "entrepreneurship": single_person.entrepreneurship
+        "entrepreneurship": single_person.entrepreneurship,
+        "entrepreneurship_successful": single_person.successful_entrepreneur
     }, index=[0])
     tmp_df.to_csv(os.path.join(os.getcwd(), 'tmp_database', 'test_data.csv'), mode='a', header=False, index=False)
 
 
-def generate_people(num_people):
-    with ProcessPoolExecutor() as executor:
+def generate_people(num_people, max_workers=None):
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
         people = list(tqdm(executor.map(generate_one_person, range(num_people)), total=num_people))
 
     people_df = pd.read_csv(os.path.join(os.getcwd(), 'tmp_database', 'test_data.csv'))
     people_df.columns = ["age", "life_expectancy", "occupation", "body_condition", "monthly_health_cost",
                          "initial_monthly_income", "food_consumption_monthly_value", "other_consumption_monthly_value",
                          "initial_saving", "retirement_payment", "jobless_subsidy", "birth_willingness",
-                         "salary_yearly_increase_rate", "entrepreneurship"]
+                         "salary_yearly_increase_rate", "entrepreneurship", "entrepreneurship_successful"]
+    # sort by age
+    people_df = people_df.sort_values(by='age')
     people_df.to_csv(os.path.join(os.getcwd(), 'tmp_database', 'test_data.csv'), index=False)
+
+    # sort by initial_saving
+    people_df = people_df.sort_values(by='initial_saving', ascending=False)
+    people_df.head(1000).to_csv(os.path.join(os.getcwd(), 'tmp_database', 'test_data_initial_saving.csv'), index=False)
+
+    # sort by entrepreneurship
+    people_df = people_df.sort_values(by='entrepreneurship', ascending=False)
+    people_df.head(1000).to_csv(os.path.join(os.getcwd(), 'tmp_database', 'test_data_entrepreneurship.csv'), index=False)
+
+    # sort by entrepreneurship_successful
+    people_df = people_df.sort_values(by=['entrepreneurship', 'entrepreneurship_successful'], ascending=False)
+    people_df.head(1000).to_csv(os.path.join(os.getcwd(), 'tmp_database', 'test_data_entrepreneurship_successful.csv'),
+                                index=False)
     return people
 
 
@@ -101,7 +117,7 @@ if __name__ == "__main__":
     except FileNotFoundError:
         pass
 
-    generate_people(10000)
+    generate_people(100000, max_workers=None)
     # print("Done!")
     #
     # plot_distribution_3d()

@@ -183,6 +183,9 @@ class SocietyParams:
     # 30% of the average monthly payment
     lowest_monthly_income = 0.3 * 100
 
+    # --------------- Entrepreneurship Success Rate ---------------
+    entrepreneurship_success_rate = 0.05
+
 
 class SinglePersonParams:
     """
@@ -220,6 +223,9 @@ class SinglePersonParams:
 
         # --------------- Entrepreneurship ---------------
         self.entrepreneurship = True if random.random() < entrepreneur_ratio_func(self.age) else False
+        self.successful_entrepreneur = True if (self.entrepreneurship and
+                                                random.random() < SocietyParams.entrepreneurship_success_rate) \
+            else False
 
         # --------------- Life Insurance ---------------
         self.life_insurance = life_insurance_func(self.occupation)
@@ -238,26 +244,45 @@ class SinglePersonParams:
         self.other_consumption_monthly_value = other_consumption_monthly_value_func(self.initial_monthly_income)
 
         # --------------- Savings ---------------
-        def initial_saving(occupation_func, age,
+        def initial_saving(occupation_func,
+                           age,
                            monthly_health_cost,
                            food_consumption_monthly_value,
-                           other_consumption_monthly_value):
-            if age < 18:
-                return 0
-            occupation = occupation_func(age)
+                           other_consumption_monthly_value,
+                           entrepreneurship=False):
             all_monthly_costs = monthly_health_cost + food_consumption_monthly_value + other_consumption_monthly_value
-            if occupation == "unemployed":
-                return 12 * ((age - 18) * np.round(random.gauss(50, 10)) - all_monthly_costs)
-            if occupation == "employed":
-                return 12 * ((age - 18) * 12 * np.round(random.gauss(100, 50)) - all_monthly_costs)
-            if occupation == "retired":
-                return (12 * ((age - 18) * 12 * np.round(random.gauss(100, 50)) - all_monthly_costs) +
-                        12 * ((age - 65) * 12 * np.round(random.gauss(40, 5)) - all_monthly_costs))
+            if not entrepreneurship:
+                if age < 18:
+                    return 0
+                occupation = occupation_func(age)
+                if occupation == "unemployed":
+                    return 12 * (age - 18) * (50 - all_monthly_costs)
+                if occupation == "employed":
+                    return 12 * (age - 18) * (100 - all_monthly_costs)
+                if occupation == "retired":
+                    return (12 * (age - 18) * (100 - all_monthly_costs) +
+                            12 * (age - 65) * (np.round(random.gauss(40, 5)) - all_monthly_costs))
+            elif entrepreneurship:
+                # If he is a successful entrepreneur
+                if self.successful_entrepreneur:
+                    # Monthly income is 20 times the average monthly payment
+                    print(f"Successful entrepreneur, initial saving: 12 * (age - 15) * (20 * 100 - all_monthly_costs)") # 这一步压根就没有执行！
+                    return 12 * (age - 15) * (20 * 100 - all_monthly_costs)
+                else:
+                    # If he is not a successful entrepreneur
+                    if age < 18:
+                        return 12 * (age - 18) * (np.round(240) - all_monthly_costs)
+                    elif age < 23:
+                        return 12 * (age - 18) * (np.round(250) - all_monthly_costs)
+                    elif age < 35:
+                        return 12 * (age - 18) * (np.round(200) - all_monthly_costs)
+                    elif age < 65:
+                        return 12 * (age - 18) * (np.round(175) - all_monthly_costs)
 
         self.initial_saving = np.round(max(initial_saving(occupation_func, self.age,
                                                           self.monthly_health_cost,
                                                           self.food_consumption_monthly_value,
-                                                          self.other_consumption_monthly_value), 0), 4)
+                                                          self.other_consumption_monthly_value), 0), 0)
 
         # --------------- Retirement Payment ---------------
         # Should be 70% of the income for the last 20 years
