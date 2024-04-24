@@ -7,15 +7,15 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import time
 
-from simulation_rich_and_poor.params import SinglePersonParams
+from simulation_rich_and_poor.params import SinglePerson
 
 
 # generate 1000 people of single person
 def generate_one_person(_):
-    single_person = SinglePersonParams()
+    single_person = SinglePerson()
     # remove people that age > life_expectancy
     while single_person.dead:
-        single_person = SinglePersonParams()
+        single_person = SinglePerson()
 
     # save detail to tmp_database as csv file
     tmp_df = pd.DataFrame({
@@ -110,15 +110,39 @@ def plot_distribution_3d():
     plt.show()
 
 
-if __name__ == "__main__":
-    # remove the file
-    try:
-        os.remove(os.path.join(os.getcwd(), 'tmp_database', 'test_data.csv'))
-    except FileNotFoundError:
-        pass
+def plot_distribution_():
+    # 读取数据
+    people_df = pd.read_csv(os.path.join(os.getcwd(), 'tmp_database', 'test_data.csv'))
+    initial_saving = people_df['initial_saving']
+    age = people_df['age']
 
-    generate_people(100000, max_workers=None)
-    # print("Done!")
+    # 创建一个3D图形
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # 绘制散点图
+    ax.scatter(age, initial_saving)
+
+    # 设置图形标题和轴标签
+    ax.set_title('Age vs. Initial Saving')
+    ax.set_xlabel('Age')
+    ax.set_ylabel('Initial Saving')
+
+    # 显示图形
+    plt.show()
+
+
+if __name__ == "__main__":
+    # # remove the file
+    # try:
+    #     os.remove(os.path.join(os.getcwd(), 'tmp_database', 'test_data.csv'))
+    # except FileNotFoundError:
+    #     pass
+    #
+    # generate_people(100000, max_workers=None)
+    # # print("Done!")
     #
     # plot_distribution_3d()
-    plot_distribution(column_name='age')
+    # plot_distribution(column_name='age')
+
+    plot_distribution_()

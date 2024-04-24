@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 # 老龄化社会
 def generate_age_aging(num_samples):
-    return np.round(np.random.gamma(shape=4, scale=10, size=num_samples))
+    return np.round(np.random.gamma(shape=1, scale=20, size=num_samples))
 
 def generate_age_youthful(num_samples):
     return np.round(np.random.gamma(shape=3, scale=10, size=num_samples))
