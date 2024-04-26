@@ -108,9 +108,9 @@ def body_condition_func():
 def initial_monthly_income_func(family_id, occupation, lowest_monthly_income):
     if occupation == "unemployed":
         return SinglePerson(family_id).jobless_subsidy
-    if occupation == "employed":
+    elif occupation == "employed":
         return np.round(max(random.gauss(100, 60), lowest_monthly_income), 4)
-    if occupation == "retired":
+    elif occupation == "retired":
         return 0
     else:
         return 0
@@ -303,6 +303,9 @@ class SinglePerson:
         self.successful_entrepreneur = successful_entrepreneur
 
         self.highest_salary_ever = 0
+        self.initial_monthly_income = 0
+        self.last_period_employee_income = 0
+        self.current_period_income = 0
 
         self.monthly_saving = None
         self.occupation = None
@@ -316,21 +319,19 @@ class SinglePerson:
         self.life_insurance = None
         self.body_condition = None
         self.monthly_health_cost = None
-        self.initial_monthly_income = None
-        self.last_period_employee_income = None
-        self.current_period_income = None
         self.food_consumption_monthly_value = None
         self.other_consumption_monthly_value = None
         self.initial_saving = None
         self.retirement_monthly_payment = None
         self.total_saving = None
-        self.jobless_subsidy = None
         self.baby_cost = None
         self.num_of_children = None
         self.birth_willingness = None
         self.salary_yearly_increase_rate = None
 
         self.family_id = family_id
+
+        self.jobless_subsidy = 0.7 * SocietyParams.lowest_monthly_income if self.occupation == "unemployed" else 0
 
     def set_initial_params(self):
         # --------------- Current Time ---------------
@@ -507,7 +508,7 @@ class SinglePerson:
             if random.random() < self.birth_willingness:
                 self.num_of_children += 1
                 # Generate a new baby with the same family ID
-                new_baby = SinglePerson(self.family_id)
+                new_baby = SinglePerson(self.family_id, preset_params=False)
                 new_baby.set_initial_params()
 
                 new_baby.age = 1
@@ -559,6 +560,8 @@ class SinglePerson:
                     self.current_period_income = self.highest_salary_ever * np.random.normal(0.9, 0.05)
             elif self.occupation == "retired":
                 self.current_period_income = 0  # will receive retirement payment below
+            else:
+                self.current_period_income = 0
 
         # If the year passed, increase the salary, including the entrepreneur
         if self.current_time.current_month == 1:
@@ -587,9 +590,14 @@ class SinglePerson:
         ############################################################################
         # --------------- Normal Consumption Cash Flow ---------------
         # Now it's fixed, will be changed to normal distribution
-        self.food_consumption_monthly_value = food_consumption_monthly_value_func(self.current_period_income, self.age)
-        self.other_consumption_monthly_value = other_consumption_monthly_value_func(self.current_period_income,
-                                                                                    self.age)
+        try:
+            self.food_consumption_monthly_value = food_consumption_monthly_value_func(self.current_period_income, self.age)
+            self.other_consumption_monthly_value = other_consumption_monthly_value_func(self.current_period_income,
+                                                                                        self.age)
+        except:
+            print(self.current_period_income, self.age)
+            print(self.__dict__)
+            raise TypeError("Error in consumption cash flow")
 
         # --------------- Health Cost ---------------
         # If there is a baby, the cost will increase
