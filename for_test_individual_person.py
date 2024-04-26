@@ -8,8 +8,10 @@ from simulation_rich_and_poor.tool_functions import generate_random_family_ID
 
 
 def generate_single_person_history(random_family_ID, num_iterations):
-    random_person = SinglePerson(random_family_ID)
+    random_person = SinglePerson(random_family_ID, age=1, life_expectancy=100, age_month=1, preset_params=True,
+                                 entrepreneurship=None, successful_entrepreneur=None)
     random_person.set_initial_params()
+    print(random_person.__dict__)
     random_person.write_to_individual_database()
 
     for i in range(num_iterations):
@@ -22,6 +24,7 @@ def read_single_person_history(family_id):
                'occupation',
                'already_married', 'entrepreneurship', 'successful_entrepreneur', 'life_insurance', 'body_condition',
                'monthly_health_cost', 'baby_cost', 'initial_monthly_income', 'current_period_income',
+               "highest_salary_ever",
                'last_period_employee_income', 'food_consumption_monthly_value', 'other_consumption_monthly_value',
                'initial_saving', "monthly_saving", 'total_saving', 'retirement_monthly_payment', 'jobless_subsidy',
                'birth_willingness',
@@ -48,10 +51,11 @@ def read_single_person_history(family_id):
 
 def plot_single_person_history(family_id):
     df = read_single_person_history(family_id)
+    print(df.shape)
     # plot line chart on total_saving
     # x axis is 1,2...months
-    plt.plot(range(len(df)), df['total_saving'])
-    plt.xlabel('Months')
+    plt.plot([i/12 for i in range(len(df))], df['total_saving'])
+    plt.xlabel('Age')
     plt.ylabel('Total Saving')
     plt.title('Total Saving over time')
     plt.show()
@@ -59,6 +63,6 @@ def plot_single_person_history(family_id):
 
 if __name__ == "__main__":
     random_family_ID = generate_random_family_ID()
-    generate_single_person_history(random_family_ID, 1000)
+    generate_single_person_history(random_family_ID, 100 * 12)
 
     plot_single_person_history(random_family_ID)

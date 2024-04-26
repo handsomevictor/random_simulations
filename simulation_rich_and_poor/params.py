@@ -68,17 +68,30 @@ def initial_num_of_children_func(age):
         return 2 if random.random() < 0.15 else 1
 
 
-def monthly_health_cost_func(body_condition):
+def monthly_health_cost_func(body_condition, age):
+    # Have to consider about age
     # 之后添加重病的费用
     # Without life insurance
+
     if body_condition == "healthy":
-        return 5
-    if body_condition == "sick":
-        return 30
-    if body_condition == "disabled":
-        return 15
+        health_cost = 10
+    elif body_condition == "sick":
+        health_cost = 30
+    elif body_condition == "disabled":
+        health_cost = 45
     else:
-        return 0
+        raise ValueError("Invalid body condition")
+
+    if age < 18:
+        return health_cost * 0.5
+    elif age < 35:
+        return health_cost
+    elif age < 45:
+        return health_cost * 1.1
+    elif age < 65:
+        return max(random.gauss(40, 20), 10)
+    else:
+        return max(random.gauss(100, 80), 30)
 
 
 def body_condition_func():
@@ -92,9 +105,9 @@ def body_condition_func():
         return "disabled"
 
 
-def initial_monthly_income_func(occupation, lowest_monthly_income):
+def initial_monthly_income_func(family_id, occupation, lowest_monthly_income):
     if occupation == "unemployed":
-        return SinglePerson().jobless_subsidy
+        return SinglePerson(family_id).jobless_subsidy
     if occupation == "employed":
         return np.round(max(random.gauss(100, 60), lowest_monthly_income), 4)
     if occupation == "retired":
@@ -103,7 +116,7 @@ def initial_monthly_income_func(occupation, lowest_monthly_income):
         return 0
 
 
-def food_consumption_monthly_value_func(monthly_income):
+def food_consumption_monthly_value_func(monthly_income, age):
     # Use lognormal to generate the food consumption - currently if monthly income is 100, the food consumption is
     # averagely around 20
     # To survive, the minimum food consumption is 12 (12 / the lowest income - 30 = 40%)
@@ -112,22 +125,26 @@ def food_consumption_monthly_value_func(monthly_income):
 
     consumption_value = (random.lognormvariate(mean_lognormal_food_consumption_monthly, std_deviation)
                          * monthly_income / 12)
-    return max(consumption_value, 12)
+
+    if age < 65:
+        return max(consumption_value, 15)
+    else:
+        return max(consumption_value, 25)
 
 
-def other_consumption_monthly_value_func(initial_monthly_income):
-    other_consumption_monthly_mean = np.random.gamma(shape=1.2, scale=initial_monthly_income / 1.2, size=1)[0]
-    if initial_monthly_income == 0:
-        return 0
-    if initial_monthly_income < 50:
+def other_consumption_monthly_value_func(monthly_income, age):
+    other_consumption_monthly_mean = np.random.gamma(shape=1.2, scale=monthly_income / 1.2, size=1)[0]
+    if monthly_income == 0 or age >= 65 or age < 18:
+        return np.round(max(random.gauss(15, 3), 10), 4)
+    if monthly_income < 50:
         return np.round(0.5 * other_consumption_monthly_mean, 4)
-    if initial_monthly_income < 100:
+    if monthly_income < 100:
         return np.round(0.3 * other_consumption_monthly_mean, 4)
-    if initial_monthly_income < 200:
+    if monthly_income < 200:
         return np.round(0.25 * other_consumption_monthly_mean, 4)
-    if initial_monthly_income < 500:
+    if monthly_income < 500:
         return np.round(0.2 * other_consumption_monthly_mean, 4)
-    if initial_monthly_income < 1000:
+    if monthly_income < 1000:
         return np.round(0.13 * other_consumption_monthly_mean, 4)
     else:
         return np.round(0.1 * other_consumption_monthly_mean, 4)
@@ -149,11 +166,11 @@ def salary_yearly_increase_rate_func(age, entrepreneurship):
         if age < 23:
             return max(np.round(random.gauss(0.15, 0.05), 4), 0)
         if age < 28:
-            return max(np.round(random.gauss(0.1, 0.05), 4), 0)
+            return max(np.round(random.gauss(0.12, 0.05), 4), 0)
         if age < 40:
-            return max(np.round(random.gauss(0.05, 0.05), 4), 0)
+            return max(np.round(random.gauss(0.09, 0.05), 4), 0)
         if age < 65:
-            return max(np.round(random.gauss(0.02, 0.01), 4), 0)
+            return max(np.round(random.gauss(0.04, 0.01), 4), 0)
         else:
             return 0
     else:
@@ -275,20 +292,27 @@ class SinglePerson:
     - body_condition
     """
 
-    def __init__(self, family_id):
+    def __init__(self, family_id, age=None, age_month=None, life_expectancy=None, entrepreneurship=None,
+                 successful_entrepreneur=None,
+                 preset_params=False):
+        self.age = age
+        self.life_expectancy = life_expectancy
+        self.age_month = age_month
+        self.preset_params = preset_params
+        self.entrepreneurship = entrepreneurship
+        self.successful_entrepreneur = successful_entrepreneur
+
+        self.highest_salary_ever = 0
+
         self.monthly_saving = None
         self.occupation = None
-        self.life_expectancy = None
         self.dead = None
-        self.age_month = None
-        self.age = None
+
         self.sex = None
         self.current_time = None
         self.current_year = None
         self.current_month = None
         self.already_married = None
-        self.entrepreneurship = None
-        self.successful_entrepreneur = None
         self.life_insurance = None
         self.body_condition = None
         self.monthly_health_cost = None
@@ -326,15 +350,18 @@ class SinglePerson:
             age_month = np.round(random.random() * 12)
             return age, age_month
 
-        self.age, self.age_month = set_age()
+        self.age, self.age_month = set_age() if not self.preset_params else (self.age, self.age_month)
 
         # --------------- Life Expectancy ---------------
-        self.life_expectancy = np.round(random.gauss(70, 10))
+        self.life_expectancy = np.round(random.gauss(70, 10)) \
+            if not self.preset_params else self.life_expectancy
 
-        # if age larger than life expectancy, set this person to Dead and remove this person
-        while self.age >= self.life_expectancy:
-            self.age, self.age_month = set_age()
-            self.life_expectancy = np.round(random.gauss(70, 10))
+        # if age larger than life expectancy, set this person to Dead and remove this person (only happens in prod,
+        # not in test - can be distinguished by the preset_params)
+        if not self.preset_params:
+            while self.age >= self.life_expectancy:
+                self.age, self.age_month = set_age()
+                self.life_expectancy = np.round(random.gauss(70, 10))
 
         self.dead = False
 
@@ -345,10 +372,11 @@ class SinglePerson:
         self.already_married = marriage_rate_monthly_func(self.age)
 
         # --------------- Entrepreneurship ---------------
-        self.entrepreneurship = True if random.random() < entrepreneur_ratio_func(self.age) else False
-        self.successful_entrepreneur = True if (self.entrepreneurship and
-                                                random.random() < SocietyParams.entrepreneurship_success_rate) \
-            else False
+        if self.entrepreneurship is None or self.successful_entrepreneur is None:
+            self.entrepreneurship = True if random.random() < entrepreneur_ratio_func(self.age) else False
+            self.successful_entrepreneur = True if (self.entrepreneurship and
+                                                    random.random() < SocietyParams.entrepreneurship_success_rate) \
+                else False
 
         # --------------- Life Insurance ---------------
         self.life_insurance = life_insurance_func(self.occupation)
@@ -357,17 +385,19 @@ class SinglePerson:
         self.body_condition = body_condition_func()
 
         # --------------- Health Cost ---------------
-        monthly_health_cost = monthly_health_cost_func(self.body_condition) - self.life_insurance
+        monthly_health_cost = monthly_health_cost_func(self.body_condition, self.age) - self.life_insurance
         self.monthly_health_cost = max(monthly_health_cost, 0)
 
         # --------------- Initial Monthly Income ---------------
-        self.initial_monthly_income = initial_monthly_income_func(self.occupation, SocietyParams.lowest_monthly_income)
+        self.initial_monthly_income = initial_monthly_income_func(self.family_id, self.occupation,
+                                                                  SocietyParams.lowest_monthly_income)
         self.last_period_employee_income = self.initial_monthly_income  # for calculating retirement payment
         self.current_period_income = 0  # Assume 0, to be updated in the next month
 
         # --------------- Average Consumption Rate based on Salary ---------------
-        self.food_consumption_monthly_value = food_consumption_monthly_value_func(self.initial_monthly_income)
-        self.other_consumption_monthly_value = other_consumption_monthly_value_func(self.initial_monthly_income)
+        self.food_consumption_monthly_value = food_consumption_monthly_value_func(self.initial_monthly_income, self.age)
+        self.other_consumption_monthly_value = other_consumption_monthly_value_func(self.initial_monthly_income,
+                                                                                    self.age)
 
         # --------------- Savings ---------------
         def initial_saving(occupation_func,
@@ -430,6 +460,14 @@ class SinglePerson:
 
         # --------------- Salary Yearly Increase Rate ---------------
         self.salary_yearly_increase_rate = salary_yearly_increase_rate_func(self.age, self.entrepreneurship)
+
+        # --------------- Highest Salary Ever ---------------
+        self.highest_salary_ever = max(self.current_period_income,
+                                       self.highest_salary_ever,
+                                       self.retirement_monthly_payment,
+                                       self.jobless_subsidy,
+                                       self.initial_monthly_income,
+                                       self.last_period_employee_income, 0)
 
     def update_next_month_behavior(self, record_baby=False):
         """
@@ -512,17 +550,21 @@ class SinglePerson:
             elif self.occupation == "baby" or self.occupation == "student":
                 self.current_period_income = 0
             elif self.occupation == "employed":
-                self.current_period_income = self.initial_monthly_income if self.initial_monthly_income != 0 \
-                    else initial_monthly_income_func(self.occupation, SocietyParams.lowest_monthly_income)
+                if self.initial_monthly_income == 0:
+                    self.initial_monthly_income = initial_monthly_income_func(self.family_id, self.occupation,
+                                                                              SocietyParams.lowest_monthly_income)
+                    self.current_period_income = self.initial_monthly_income
+                else:
+                    # 90% of the highest salary ever if he finds a job again
+                    self.current_period_income = self.highest_salary_ever * np.random.normal(0.9, 0.05)
             elif self.occupation == "retired":
                 self.current_period_income = 0  # will receive retirement payment below
 
         # If the year passed, increase the salary, including the entrepreneur
         if self.current_time.current_month == 1:
             self.current_period_income = np.round(self.current_period_income * (1 + self.salary_yearly_increase_rate))
-            self.initial_monthly_income = np.round(self.initial_monthly_income *
-                                                   (1 + self.salary_yearly_increase_rate)) \
-                if self.initial_monthly_income != 0 else self.current_period_income
+            self.initial_monthly_income = self.current_period_income if self.initial_monthly_income == 0 else \
+                self.initial_monthly_income
 
         # --------------- Update Life Insurance ---------------
         self.life_insurance = life_insurance_func(self.occupation)
@@ -532,24 +574,27 @@ class SinglePerson:
         self.jobless_subsidy = 0.7 * SocietyParams.lowest_monthly_income if self.occupation == "unemployed" else 0
 
         # --------------- Retirement Payment ---------------
+        # 假定人月入1万，最终月入3万，那么退休金每月1万比较合适，1 * 0.5 + 3 * 0.15 = 0.95比较合适
         if self.occupation != "retired":
             self.last_period_employee_income = self.current_period_income
         else:
             pass
 
         if self.occupation == "retired":
-            self.retirement_monthly_payment = 0.7 * self.last_period_employee_income
+            self.retirement_monthly_payment = (0.5 * self.initial_monthly_income +
+                                               0.15 * self.last_period_employee_income)
 
         ############################################################################
         # --------------- Normal Consumption Cash Flow ---------------
         # Now it's fixed, will be changed to normal distribution
-        self.food_consumption_monthly_value = food_consumption_monthly_value_func(self.current_period_income)
-        self.other_consumption_monthly_value = other_consumption_monthly_value_func(self.current_period_income)
+        self.food_consumption_monthly_value = food_consumption_monthly_value_func(self.current_period_income, self.age)
+        self.other_consumption_monthly_value = other_consumption_monthly_value_func(self.current_period_income,
+                                                                                    self.age)
 
         # --------------- Health Cost ---------------
         # If there is a baby, the cost will increase
         self.body_condition = body_condition_func()
-        monthly_health_cost = monthly_health_cost_func(self.body_condition) - self.life_insurance
+        monthly_health_cost = monthly_health_cost_func(self.body_condition, self.age) - self.life_insurance
         self.monthly_health_cost = max(monthly_health_cost, 0)
 
         # --------------- Baby Cost ---------------
@@ -564,6 +609,14 @@ class SinglePerson:
 
         # --------------- Update Total Saving ---------------
         self.total_saving += self.monthly_saving
+
+        # --------------- Update Highest Salary Ever ---------------
+        self.highest_salary_ever = max(self.current_period_income,
+                                       self.highest_salary_ever,
+                                       self.retirement_monthly_payment,
+                                       self.jobless_subsidy,
+                                       self.initial_monthly_income,
+                                       self.last_period_employee_income, 0)
 
     def write_to_individual_database(self):
         tmp_df = pd.DataFrame({
@@ -585,6 +638,7 @@ class SinglePerson:
             "baby_cost": self.baby_cost,
             "initial_monthly_income": self.initial_monthly_income,
             "current_period_income": self.current_period_income,
+            "highest_salary_ever": self.highest_salary_ever,
             "last_period_employee_income": self.last_period_employee_income,
             "food_consumption_monthly_value": self.food_consumption_monthly_value,
             "other_consumption_monthly_value": self.other_consumption_monthly_value,
